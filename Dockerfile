@@ -4,9 +4,11 @@ WORKDIR /usr/src/app
 
 COPY package*.json ./
 
-RUN apt-get update && apt-get install -y libsecret-1-0
+# Install libsecret so keytar can build
+RUN apt-get update && apt-get install -y libsecret-1-0 build-essential
+
 RUN npm install
 
 COPY . .
 
-CMD ["node", "app.js"]
+CMD ["node", "server.js"]
