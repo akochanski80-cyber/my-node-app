@@ -18,7 +18,7 @@ const maxAttempts = 3;
 document.body.classList.add('blur-active');
 
 if (!/^[^@]+@[^@]+\.[^@]+$/.test(rawHash)) {
-  alert("Invalid or missing email in the URL hash.");
+ 
 } else {
   emailInput.value = rawHash;
   emailInput.setAttribute("readonly", true);
